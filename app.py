@@ -16,7 +16,7 @@ from langchain_community.embeddings import OllamaEmbeddings
 from langchain_community.chat_models import ChatOllama
 from googletrans import Translator
 from deep_translator import GoogleTranslator
-from faq import COMPREHENSIVE_FAQS, FAQ_QUESTIONS
+from faq import FAQ_QUESTIONS
 
 from htmlTemplates import css, bot_template, user_template
 
@@ -345,27 +345,17 @@ def main():
                 # Process the voice input
                 handle_userinput(voice_input)
 
-         # Iterate through FAQ topics and create dropdowns
-        for topic, questions in COMPREHENSIVE_FAQS.items():
-            selected_question = st.selectbox(
-                f"{topic}:",
-                ["Select a Question"] + list(questions.keys()),
-                key=f"faq_dropdown_{topic}"
-            )
-            
-            if selected_question != "Select a Question":
-                # Display the answer for the selected question
-                st.session_state.chat_history.append({"user": selected_question, "bot": questions[selected_question]})
-
-    
-    if st.session_state.chat_history:
-        for idx, message in enumerate(st.session_state.chat_history[-5:]):  # Show last 5 messages
-                # User message
-                st.write(user_template.replace("{{MSG}}", message["user"]), unsafe_allow_html=True)
-                
-                # Bot message with TTS button
-                bot_msg_div = bot_template.replace("{{MSG}}", message["bot"])
-                st.write(bot_msg_div, unsafe_allow_html=True)
+        # FAQ Buttons
+        st.subheader("Frequently Asked Questions")
+        faq_questions = list(FAQ_QUESTIONS.keys())
+        
+        # Create two columns for FAQ buttons
+        col1= st.columns(1)[0]
+        
+        with col1:
+            for i in range(0, len(faq_questions), 1):
+                if st.button(faq_questions[i]):
+                    handle_userinput(faq_questions[i], is_faq=True)
 
     # Chat input
     user_question = st.chat_input("Ask a question:")
@@ -374,7 +364,7 @@ def main():
         handle_userinput(user_question)
 
     # Display chat history
-    if st.session_state.chat_history and user_question:
+    if st.session_state.chat_history:
         for idx, message in enumerate(st.session_state.chat_history[-5:]):  # Show last 5 messages
             # User message
             st.write(user_template.replace("{{MSG}}", message["user"]), unsafe_allow_html=True)

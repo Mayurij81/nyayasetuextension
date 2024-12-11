@@ -78,4 +78,48 @@ COMPREHENSIVE_FAQS = {
     }
 }
 
-FAQ_QUESTIONS={}
+
+FAQ_QUESTIONS = {
+    "How to check case status?":
+         
+        "To check the current status of the case, follow the steps given below:\n\n"
+        "Step 1: Visit the eCourt website: https://ecourts.gov.in/ecourts_home/\n\n"
+        "Step 2: Select services based on your case’s court.\n\n"
+        "Step 3: Enter your CNR number and captcha.\n",
+
+    "Live stream of cases": 
+        "To watch the live court proceedings, go to:\n"
+        "https://www.sci.gov.in/live-streaming/\n\n"
+        "To view archived live streams, click on the link below:\n"
+        "https://www.sci.gov.in/previous-sessions/\n",
+
+    "What is Legal Aid": 
+        "To learn more about pro-bono cases, visit:\n"
+        "https://probono-doj.in/home/index\n\n"
+        "For additional information on legal aid, refer to:\n"
+        "https://nalsa.gov.in/services/legal-aid\n",
+
+    "What is Efiling?": 
+        "Follow these steps to file a case:\n\n"
+        "Step 1: Visit the website: https://filing.ecourts.gov.in/pdedev/#\n\n"
+        "Step 2: Select your designation.\n\n"
+        "Step 3: Log in by entering your username and password.\n"
+        "After logging in, you can access manuals, FAQs, and videos for reference on the home page.\n",
+
+    "Virtual Justice Clock": 
+        "The Justice Clock installed near the main entrance of the High Court displays statistical "
+        "information such as the institution, disposal, and pendency of cases in the High Court and "
+        "in the District Courts.\n\n"
+        "To learn more, visit: https://justiceclock.ecourts.gov.in/justiceClock/\n",
+
+    "How to file a Cyber Crime ":
+        " The Government of India provides an online platform for reporting cybercrimes.\n\n"
+        "Visit the Cybercrime Reporting Portal cybercrime.gov.in.\n\n"
+        "This portal is managed by the Ministry of Home Affairs and handles complaints, including child pornography, cyber harassment, and online financial fraud.\n\n"
+        """Select the Type of Crime: Choose categories like "Women/Child-related Report" or "Other Cyber Crimes.\n\n""",
+
+    "File a Complaint":
+        "Register on the portal with your email or mobile number.\n\n"
+        "Fill in details about the crime, upload evidence, and submit.\n"
+        "A tracking ID will be provided for status updates."
+}
