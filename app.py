@@ -6,6 +6,7 @@ from gtts import gTTS
 import tempfile
 import pygame  # For playing audio
 import threading  # To handle audio playback in a separate thread
+import speech_recognition as sr  # New import for voice recognition
 from PyPDF2 import PdfReader
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.vectorstores import Chroma
@@ -51,6 +52,17 @@ LANGUAGES = {
 
 # Supported TTS languages
 TTS_SUPPORTED_LANGUAGES = ['en', 'hi', 'es', 'fr', 'de', 'zh-CN', 'pt', 'ja']
+
+SPEECH_RECOGNITION_LANGUAGES = {
+    'English': 'en-US',
+    'Hindi': 'hi-IN',
+    'Spanish': 'es-ES',
+    'French': 'fr-FR',
+    'German': 'de-DE',
+    'Chinese': 'zh-CN',
+    'Portuguese': 'pt-BR',
+    'Japanese': 'ja-JP'
+}
 
 # Manually defined FAQ mapping
 FAQ_QUESTIONS = {
@@ -243,6 +255,48 @@ def speak_text(text, selected_language):
     # Start audio playback in a separate thread
     threading.Thread(target=play_audio_thread, daemon=True).start()
 
+# New function for voice recognition
+def recognize_speech(language):
+    """
+    Recognize speech input based on selected language
+    
+    Args:
+        language (str): Selected language name
+    
+    Returns:
+        str: Recognized speech text or None if recognition fails
+    """
+    recognizer = sr.Recognizer()
+    
+    try:
+        # Get the language code for speech recognition
+        lang_code = SPEECH_RECOGNITION_LANGUAGES.get(language, 'en-US')
+        
+        # Use microphone as source
+        with sr.Microphone() as source:
+            st.info(f"Listening... (Speak in {language})")
+            
+            # Adjust for ambient noise
+            recognizer.adjust_for_ambient_noise(source, duration=1)
+            
+            # Listen for speech with timeout
+            audio = recognizer.listen(source, timeout=5, phrase_time_limit=5)
+        
+        # Recognize speech
+        try:
+            text = recognizer.recognize_google(audio, language=lang_code)
+            st.success(f"Recognized: {text}")
+            return text
+        except sr.UnknownValueError:
+            st.error("Sorry, could not understand the audio.")
+        except sr.RequestError as e:
+            st.error(f"Could not request results from Google Speech Recognition service; {e}")
+    
+    except Exception as e:
+        st.error(f"An error occurred during speech recognition: {e}")
+    
+    return None
+
 def handle_userinput(user_question, is_faq=False):
     """Process user questions and retrieve answers."""
     if not user_question.strip():
@@ -326,6 +380,15 @@ def main():
         except Exception as e:
             st.error(f"An error occurred while processing the PDFs: {e}")
             logging.error(f"Error in processing PDFs: {e}")
+
+        # Voice Input Button
+        if st.button("🎤 Voice Input"):
+            # Call voice recognition function
+            voice_input = recognize_speech(st.session_state.selected_language)
+            
+            if voice_input:
+                # Process the voice input
+                handle_userinput(voice_input)
 
         # FAQ Buttons
         st.subheader("Frequently Asked Questions")
