@@ -87,12 +87,6 @@ FAQ_QUESTIONS = {
         "Step 2: Select services based on your case’s court.\n\n"
         "Step 3: Enter your CNR number and captcha.\n",
 
-    "Live stream of cases": 
-        "To watch the live court proceedings, go to:\n"
-        "https://www.sci.gov.in/live-streaming/\n\n"
-        "To view archived live streams, click on the link below:\n"
-        "https://www.sci.gov.in/previous-sessions/\n",
-
     "What is Legal Aid": 
         "To learn more about pro-bono cases, visit:\n"
         "https://probono-doj.in/home/index\n\n"
