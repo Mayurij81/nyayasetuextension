@@ -73,41 +73,77 @@ translator = Translator()
 
 # Extract text from PDFs
 def get_pdf_text(pdf_docs):
+    """
+    Extract text from PDF documents with more robust text extraction
+    """
     text = ""
     for pdf in pdf_docs:
-        pdf_reader = PdfReader(pdf)
-        for page in pdf_reader.pages:
-            text += page.extract_text()
+        try:
+            pdf_reader = PdfReader(pdf)
+            for page in pdf_reader.pages:
+                page_text = page.extract_text()
+                # Additional cleaning and preprocessing
+                page_text = page_text.replace('\n\n', ' ').replace('\n', ' ').strip()
+                text += page_text + "\n\n"  # Add double newline between pages
+        except Exception as e:
+            logging.error(f"Error extracting text from PDF {pdf}: {e}")
+    
+    # Optional: Log the total extracted text length for debugging
+    logging.info(f"Total extracted text length: {len(text)} characters")
     return text
 
 def get_text_chunks(text):
+    """
+    Improved text chunking with more context preservation
+    """
     text_splitter = CharacterTextSplitter(
         separator="\n",
-        chunk_size=1000,
-        chunk_overlap=200,
+        chunk_size=1500,  # Increased chunk size
+        chunk_overlap=300,  # Increased overlap for better context
         length_function=len
     )
     chunks = text_splitter.split_text(text)
+    
+    # Log chunks for debugging
+    logging.info(f"Created {len(chunks)} text chunks")
+    for i, chunk in enumerate(chunks[:5], 1):  # Log first 5 chunks
+        logging.info(f"Chunk {i} preview (first 200 chars): {chunk[:200]}...")
+    
     return chunks
 
 def load_vector_db():
+    """
+    Enhanced vector database loading with more robust error handling and logging
+    """
     embeddings = OllamaEmbeddings(model=EMBEDDING_MODEL)
 
     if os.path.exists(PERSIST_DIRECTORY):
-        vectorstore = Chroma(
-            collection_name=VECTOR_STORE_NAME,
-            embedding_function=embeddings,
-            persist_directory=PERSIST_DIRECTORY
-        )
-        logging.info("Loaded existing Chroma vector database.")
-    else:
-        pdf_docs = [os.path.join(PDF_DIRECTORY, f) for f in os.listdir(PDF_DIRECTORY) if f.endswith('.pdf')]
-        if not pdf_docs:
-            raise FileNotFoundError(f"No PDF files found in {PDF_DIRECTORY}.")
+        try:
+            vectorstore = Chroma(
+                collection_name=VECTOR_STORE_NAME,
+                embedding_function=embeddings,
+                persist_directory=PERSIST_DIRECTORY
+            )
+            
+            # Verify the number of documents in the vector store
+            document_count = vectorstore._collection.count()
+            logging.info(f"Loaded existing Chroma vector database with {document_count} documents.")
+            
+            return vectorstore
+        except Exception as e:
+            logging.error(f"Error loading existing vector database: {e}")
+            # Fall through to recreate the database
+    
+    # If no existing database or loading failed, create a new one
+    pdf_docs = [os.path.join(PDF_DIRECTORY, f) for f in os.listdir(PDF_DIRECTORY) if f.endswith('.pdf')]
+    
+    if not pdf_docs:
+        raise FileNotFoundError(f"No PDF files found in {PDF_DIRECTORY}.")
 
-        raw_text = get_pdf_text(pdf_docs)
-        text_chunks = get_text_chunks(raw_text)
+    raw_text = get_pdf_text(pdf_docs)
+    text_chunks = get_text_chunks(raw_text)
 
+    try:
         vectorstore = Chroma.from_texts(
             texts=text_chunks,
             embedding=embeddings,
@@ -115,25 +151,48 @@ def load_vector_db():
             persist_directory=PERSIST_DIRECTORY
         )
         vectorstore.persist()
-        logging.info("Chroma vector database created and persisted.")
+        
+        # Log the number of documents added
+        document_count = vectorstore._collection.count()
+        logging.info(f"Created and persisted Chroma vector database with {document_count} documents.")
+        
+        return vectorstore
+    except Exception as e:
+        logging.error(f"Error creating vector database: {e}")
+        raise
 
-    return vectorstore
+# Optional: Add a debug function to inspect the vector store
+def debug_vector_store(vectorstore, query, top_k=5):
+    """
+    Debug function to print retrieved documents for a given query
+    """
+    results = vectorstore.similarity_search(query, k=top_k)
+    logging.info(f"Retrieved {len(results)} documents for query: {query}")
+    for i, doc in enumerate(results, 1):
+        logging.info(f"Document {i} preview:\n{doc.page_content[:500]}...")
 
 def get_conversation_chain(vectorstore):
     llm = ChatOllama(
         model=MODEL_NAME, 
-        max_tokens=200, 
+        max_tokens=300,  # Increased token limit for more detailed responses
         temperature=0.5
     )
     memory = ConversationBufferMemory(
-        memory_key='chat_history', return_messages=True
+        memory_key='chat_history', 
+        return_messages=True,
+        max_token_limit=1000  # Added to limit memory size
     )
     conversation_chain = ConversationalRetrievalChain.from_llm(
         llm=llm,
-        retriever=vectorstore.as_retriever(search_kwargs={"k": 5}),
-        memory=memory
+        retriever=vectorstore.as_retriever(
+            search_kwargs={
+                "k": 5  # Number of context documents to retrieve
+            }
+        ),
+        memory=memory,
+        verbose=True  # Enable verbose mode for debugging
     )
-    logging.info("Conversation chain created successfully.")
+    logging.info("Conversation chain created with enhanced context memory.")
     return conversation_chain
 
 def translate_text(text, target_lang):
@@ -283,7 +342,12 @@ def handle_userinput(user_question, is_faq=False):
                 translated_question = user_question
             
             # Get response from LangChain
-            response = st.session_state.conversation({'question': translated_question})
+            response = st.session_state.conversation({
+                'question': translated_question,
+                'chat_history': [
+                    (msg['user'], msg['bot']) for msg in st.session_state.chat_history[-3:]
+                ]
+            })
             if not response or 'answer' not in response:
                 st.error("No valid response could be retrieved.")
                 logging.error("LangChain response is None or missing 'answer'.")
@@ -296,10 +360,15 @@ def handle_userinput(user_question, is_faq=False):
         
         # Append to chat history
         st.session_state.chat_history.append({"user": user_question, "bot": translated_response})
+
+        # Optional: Limit chat history to prevent memory overflow
+        if len(st.session_state.chat_history) > 10:
+            st.session_state.chat_history = st.session_state.chat_history[-10:]
     except Exception as e:
         st.error(f"An error occurred while processing your question: {e}")
         logging.error(f"Error in handle_userinput: {e}")
         return
+
     
 # Streamlit app configuration
 st.set_page_config(page_title="Nyaysetu", page_icon="https://i.ibb.co/1XLGTs1/Whats-App-Image-2024-11-21-at-20-26-32-5dec28a6.jpg")
@@ -357,26 +426,59 @@ def main():
                 if st.button(faq_questions[i]):
                     handle_userinput(faq_questions[i], is_faq=True)
 
-    # Chat input
-    user_question = st.chat_input("Ask a question:")
+    # Manage chat input state
+    if 'reply_context' not in st.session_state:
+        st.session_state.reply_context = None
 
-    if user_question:
-        handle_userinput(user_question)
+    # Handle reply context display
+    if st.session_state.reply_context:
+        st.info(f"Replying to: {st.session_state.reply_context}")
 
-    # Display chat history
+    # Chat input with unique key
+    user_question = st.chat_input(
+        placeholder="Ask a question:",
+        key="primary_chat_input"
+    )
+
+    # If there's a reply context, prepend it to the question
+    if user_question and st.session_state.reply_context:
+        full_question = f"Regarding previous context - {st.session_state.reply_context}: {user_question}"
+        # Reset reply context after use
+        st.session_state.reply_context = None
+    else:
+        full_question = user_question
+
+    # Process user input
+    if full_question:
+        handle_userinput(full_question)
+
+    # Display chat history with reply functionality
     if st.session_state.chat_history:
-        for idx, message in enumerate(st.session_state.chat_history[-5:]):  # Show last 5 messages
+        for idx, message in enumerate(st.session_state.chat_history[-5:]):
             # User message
             st.write(user_template.replace("{{MSG}}", message["user"]), unsafe_allow_html=True)
             
-            # Bot message with TTS button
+            # Bot message
             bot_msg_div = bot_template.replace("{{MSG}}", message["bot"])
             st.write(bot_msg_div, unsafe_allow_html=True)
             
+            # Action buttons
+            col1, col2 = st.columns([4, 1])
             
-            tts_button = st.button(f"🔊 Listen", key=f"tts_1_{idx}")
-            if tts_button:
-                speak_text(message["bot"], st.session_state.selected_language)
+            with col1:
+                # TTS Button
+                tts_button = st.button(f"🔊 Listen", key=f"tts_{idx}")
+                if tts_button:
+                    speak_text(message["bot"], st.session_state.selected_language)
+            
+            with col2:
+                # Reply Button
+                reply_button = st.button(f"↩️ Reply", key=f"reply_{idx}")
+                if reply_button:
+                    # Set the reply context
+                    st.session_state.reply_context = message["user"]
+                    # Trigger a rerun to show reply context
+                    st.rerun()
 
 
 if __name__ == '__main__':
