@@ -1,4 +1,20 @@
 import os
+from dotenv import load_dotenv
+load_dotenv(dotenv_path=".env",override=True)
+
+os.environ["LANGCHAIN_TRACING_V2"]="true"
+os.environ["LANGCHAIN_PROJECT"]="NYAYSETU"
+from langchain_community.embeddings import OllamaEmbeddings  # Adjust if needed
+os.environ["LANGCHAIN_API_KEY"]=os.getenv("LANGCHAIN_API_KEY")
+
+from langchain_community.embeddings import OllamaEmbeddings
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_community.llms import Ollama
+
+llm=Ollama(model="llama3.2")
+output_parser=StrOutputParser()
+
 import time
 import logging
 import streamlit as st
@@ -455,7 +471,7 @@ def main():
         st.info(f"Replying to: {st.session_state.reply_context}")
 
     # Chat input with unique key
-    col1, col2 = st.columns(2)
+    col1, col2 = st.columns([12,1])
 
     with col1:
         user_question = st.chat_input(
