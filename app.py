@@ -17,6 +17,7 @@ from langchain_community.chat_models import ChatOllama
 from googletrans import Translator
 from deep_translator import GoogleTranslator
 from faq import FAQ_QUESTIONS
+from datetime import datetime
 
 from htmlTemplates import css, bot_template, user_template
 
@@ -73,9 +74,6 @@ translator = Translator()
 
 # Extract text from PDFs
 def get_pdf_text(pdf_docs):
-    """
-    Extract text from PDF documents with more robust text extraction
-    """
     text = ""
     for pdf in pdf_docs:
         try:
@@ -87,8 +85,7 @@ def get_pdf_text(pdf_docs):
                 text += page_text + "\n\n"  # Add double newline between pages
         except Exception as e:
             logging.error(f"Error extracting text from PDF {pdf}: {e}")
-    
-    # Optional: Log the total extracted text length for debugging
+
     logging.info(f"Total extracted text length: {len(text)} characters")
     return text
 
@@ -174,7 +171,7 @@ def debug_vector_store(vectorstore, query, top_k=5):
 def get_conversation_chain(vectorstore):
     llm = ChatOllama(
         model=MODEL_NAME, 
-        max_tokens=300,  # Increased token limit for more detailed responses
+        max_tokens=300,
         temperature=0.5
     )
     memory = ConversationBufferMemory(
@@ -294,7 +291,7 @@ def recognize_speech(language):
             recognizer.adjust_for_ambient_noise(source, duration=1)
             
             # Listen for speech with timeout
-            audio = recognizer.listen(source, timeout=5, phrase_time_limit=5)
+            audio = recognizer.listen(source, timeout=15, phrase_time_limit=15)
         
         # Recognize speech
         try:
@@ -382,9 +379,32 @@ if "chat_history" not in st.session_state:
 if "selected_language" not in st.session_state:
     st.session_state.selected_language = "English"
 
+current_hour=datetime.now().hour
+def get_greeting():
+    if current_hour < 12:
+        return "Good Morning"
+    elif current_hour >=12 and current_hour<18:
+        return "Good Afternon"
+    else:
+        return "Good Evening"
+
 # Main app logic
 def main():
+    st.markdown(
+    """
+    <style>
+    /* Add gradient background to the main app */
+    .stApp {
+        background: linear-gradient(to right, #f2d49d, #FBAC1B);
+        color: #000000; /* Ensure text is visible */
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+    )
     st.header("NYAYASETU")
+    st.write(get_greeting())
+    st.write("I am an AI-based chatbot who is here to answer your queries about the Department of Justice of India")
     
     # Language selection and FAQ buttons in sidebar
     with st.sidebar:
@@ -405,14 +425,14 @@ def main():
             st.error(f"An error occurred while processing the PDFs: {e}")
             logging.error(f"Error in processing PDFs: {e}")
 
-        # Voice Input Button
-        if st.button("🎤 Voice Input"):
-            # Call voice recognition function
-            voice_input = recognize_speech(st.session_state.selected_language)
+        # # Voice Input Button
+        # if st.button("🎤 Voice Input"):
+        #     # Call voice recognition function
+        #     voice_input = recognize_speech(st.session_state.selected_language)
             
-            if voice_input:
-                # Process the voice input
-                handle_userinput(voice_input)
+        #     if voice_input:
+        #         # Process the voice input
+        #         handle_userinput(voice_input)
 
         # FAQ Buttons
         st.subheader("Frequently Asked Questions")
@@ -435,10 +455,24 @@ def main():
         st.info(f"Replying to: {st.session_state.reply_context}")
 
     # Chat input with unique key
-    user_question = st.chat_input(
-        placeholder="Ask a question:",
-        key="primary_chat_input"
-    )
+    col1, col2 = st.columns(2)
+
+    with col1:
+        user_question = st.chat_input(
+            placeholder="Ask a question:",
+            key="primary_chat_input"
+        )
+    with col2:
+        # Voice Input Button
+        if st.button("🎤"):
+            # Call voice recognition function
+            voice_input = recognize_speech(st.session_state.selected_language)
+            
+            if voice_input:
+                # Process the voice input
+                handle_userinput(voice_input)
+
+    container = st.container()
 
     # If there's a reply context, prepend it to the question
     if user_question and st.session_state.reply_context:
@@ -454,7 +488,7 @@ def main():
 
     # Display chat history with reply functionality
     if st.session_state.chat_history:
-        for idx, message in enumerate(st.session_state.chat_history[-5:]):
+        for idx, message in enumerate(reversed(st.session_state.chat_history[-5:])):
             # User message
             st.write(user_template.replace("{{MSG}}", message["user"]), unsafe_allow_html=True)
             
@@ -463,17 +497,17 @@ def main():
             st.write(bot_msg_div, unsafe_allow_html=True)
             
             # Action buttons
-            col1, col2 = st.columns([4, 1])
+            col1, col2 = st.columns([1, 12])
             
             with col1:
                 # TTS Button
-                tts_button = st.button(f"🔊 Listen", key=f"tts_{idx}")
+                tts_button = st.button(f"🔊", key=f"tts_{idx}")
                 if tts_button:
                     speak_text(message["bot"], st.session_state.selected_language)
             
             with col2:
                 # Reply Button
-                reply_button = st.button(f"↩️ Reply", key=f"reply_{idx}")
+                reply_button = st.button(f"↩️", key=f"reply_{idx}")
                 if reply_button:
                     # Set the reply context
                     st.session_state.reply_context = message["user"]
